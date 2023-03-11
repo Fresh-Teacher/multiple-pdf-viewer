@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multiple PDF Viewer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.8.335/pdf.min.js"></script>
+  <style>
+    .pdf-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .the-canvas {
+      border: 1px solid black;
+      direction: ltr;
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <script src="//mozilla.github.io/pdf.js/build/pdf.js"></script>
+
+  <h1>Multiple PDF Viewer</h1>
+
+  <div id="pdf-list">
+    <div class="pdf-container">
+      <h2>PDF File 1</h2>
+      <a href="https://raw.githubusercontent.com/Fresh-Teacher/secondary/main/-GENETICS%20AND%20EVOLUTION%20S4.pdf" download><strong>Download File</strong></a><br>
+      <div>
+        <button class="prev">Previous Page</button>
+        <button class="next">Next Page</button>
+        &nbsp; &nbsp;
+        <span>Page: <span class="page_num"></span> / <span class="page_count"></span></span>
+      </div>
+      <canvas class="the-canvas"></canvas>
+    </div>
+    
+    <div class="pdf-container">
+      <h2>PDF File 2</h2>
+      <a href="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" download><strong>Download File</strong></a><br>
+      <div>
+        <button class="prev">Previous Page</button>
+        <button class="next">Next Page</button>
+        &nbsp; &nbsp;
+        <span>Page: <span class="page_num"></span> / <span class="page_count"></span></span>
+      </div>
+      <canvas class="the-canvas"></canvas>
+    </div>
+    
+    <div class="pdf-container">
+      <h2>PDF File 3</h2>
+      <a href="https://www.orimi.com/pdf-test.pdf" download><strong>Download File</strong></a><br>
+      <div>
+        <button class="prev">Previous Page</button>
+        <button class="next">Next Page</button>
+        &nbsp; &nbsp;
+        <span>Page: <span class="page_num"></span> / <span class="page_count"></span></span>
+      </div>
+      <canvas class="the-canvas"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // Loaded via <script> tag, create shortcut to access PDF.js exports.
+    var pdfjsLib = window['pdfjs-dist/build/pdf'];
+
+    // The workerSrc property shall be specified.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '//mozilla.github.io/pdf.js/build/pdf.worker.js';
+
+    var pdfDocs = [],
+        pageNums = [],
+        pageRenderings = [],
+        pageNumPendings = [],
+        scales = [],
+        canvases = document.getElementsByClassName('the-canvas'),
+        ctxs = [],
+        pdfContainers = document.getElementsByClassName('pdf-container'),
+        numPages = 0,currentPage = 1;
+        // Function to load PDF documents and render the first page
+function loadPDF(pdfURL, pdfIndex) {
+  pdfDocs[pdfIndex] = null;
+  pageNums[pdfIndex] = 1;
+  pageRenderings[pdfIndex] = [];
+  pageNumPendings[pdfIndex] = null;
+  scales[pdfIndex] = 1.5;
+  ctxs[pdfIndex] = canvases[pdfIndex].getContext('2d');
+
+  pdfjsLib.getDocument(pdfURL).promise.then(function(pdfDoc_) {
+    pdfDocs[pdfIndex] = pdfDoc_;
+    numPages = pdfDoc_.numPages;
+    document.getElementsByClassName('page_count')[pdfIndex].textContent = numPages;
+
+    renderPage(pdfIndex);
+  });
+}
+
+// Function to render the specified page of a PDF document
+function renderPage(pdfIndex) {
+  if (pageNumPendings[pdfIndex] !== null) {
+    return;
+  }
+  pageNumPendings[pdfIndex] = pageNums[pdfIndex];
+
+  if (pageRenderings[pdfIndex][pageNums[pdfIndex]] !== undefined) {
+    showPage(pdfIndex);
+  } else {
+    pdfDocs[pdfIndex].getPage(pageNums[pdfIndex]).then(function(page) {
+      var viewport = page.getViewport({ scale: scales[pdfIndex] });
+      canvases[pdfIndex].height = viewport.height;
+      canvases[pdfIndex].width = viewport.width;
+
+      var renderContext = {
+        canvasContext: ctxs[pdfIndex],
+        viewport: viewport
+      };
+
+      var renderTask = page.render(renderContext);
+
+      renderTask.promise.then(function() {
+        pageRenderings[pdfIndex][pageNums[pdfIndex]] = true;
+        showPage(pdfIndex);
+      });
+    });
+  }
+}
+
+// Function to display the current page of a PDF document
+function showPage(pdfIndex) {
+  var pageRendering = pageRenderings[pdfIndex][pageNums[pdfIndex]];
+  if (pdfDocs[pdfIndex] !== null && pageRendering !== undefined) {
+    ctxs[pdfIndex].drawImage(pageRenderings[pdfIndex][pageNums[pdfIndex]], 0, 0);
+
+    document.getElementsByClassName('page_num')[pdfIndex].textContent = pageNums[pdfIndex];
+    pageNumPendings[pdfIndex] = null;
+
+     // Enable or disable buttons depending on page number
+    if (pageNums[pdfIndex] >= numPages) {
+      document.getElementsByClassName('next')[pdfIndex].disabled = true;
+    } else {
+      document.getElementsByClassName('next')[pdfIndex].disabled = false;
+    }
+    if (pageNums[pdfIndex] <= 1) {
+      document.getElementsByClassName('prev')[pdfIndex].disabled = true;
+    } else {
+      document.getElementsByClassName('prev')[pdfIndex].disabled = false;
+    }
+  }
+}
+
+// Event listener for Previous Page button
+var prevButtons = document.getElementsByClassName('prev');
+for (var i = 0; i < prevButtons.length; i++) {
+  prevButtons[i].addEventListener('click', function() {
+    currentPage--;
+    if (currentPage < 1) {
+      currentPage = numPages;
+    }
+    pageNums[0] = currentPage;
+    renderPage(0);
+  });
+}
+
+// Event listener for Next Page button
+var nextButtons = document.getElementsByClassName('next');
+for (var i = 0; i < nextButtons.length; i++) {
+  nextButtons[i].addEventListener('click', function() {
+    currentPage++;
+    if (currentPage > numPages) {
+      currentPage = 1;
+    }
+    pageNums[0] = currentPage;
+    renderPage(0);
+  });
+}
+
+// Load all PDFs
+loadPDF('https://raw.githubusercontent.com/Fresh-Teacher/secondary/main/-GENETICS%20AND%20EVOLUTION%20S4.pdf', 0);
+loadPDF('https://raw.githubusercontent.com/Fresh-Teacher/secondary/main/02%20--%20S.2%20Mathematics%20Revision%20Work%20-and%20Upload.pdf', 1);
+loadPDF('https://raw.githubusercontent.com/Fresh-Teacher/secondary/main/05%20--%20S.6%20ENT%203%20REVISION%20QNS.pdf', 2);
+</script>
+</body>
+</html>
